@@ -1,5 +1,5 @@
 # face_inpainting
-implementation of a nueral network that can fill holes in images of faces
+implementation of a neural network that can fill holes in images of faces
 
 # References
 
