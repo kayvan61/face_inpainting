@@ -1,7 +1,8 @@
 import cv2 as cv 
 from matplotlib import pyplot as plt
 import numpy as np
-from model import load_model
+from model import load_model, get_device
+import torch
 
 def auto_canny(image, sigma=0.33):
     # compute the median of the single channel pixel intensities
@@ -14,51 +15,32 @@ def auto_canny(image, sigma=0.33):
     return edged
 
 filename = "IMG_0146.jpg"
+model_name = "partConvModelCheckpoint.pt"
 
 img = cv.imread(filename, cv.COLOR_RGB2HSV)
-#img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-#img = cv.GaussianBlur(img, (3,3), 0)
-#edges = auto_canny(img)
 
-print(img.shape)
+print("loaded image with shape:", img.shape)
 
+print("creating edge map using canny")
 img[:,:,1] = 255
 img = cv.bilateralFilter(img,15,100,75)
 filter = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
 img = cv.filter2D(img,-1,filter)
 edges = cv.Canny(img,100,200)
 
-# Apply Laplacian operator in some higher datatype
-#blur = cv.GaussianBlur(img,(5,5),0)
-#edges = cv.Laplacian(blur, ddepth=cv.CV_16S)
-#edges = cv.convertScaleAbs(edges)
-
 kernel_s = (5,5)
-print(kernel_s)
 kernel = np.ones(kernel_s,np.uint8)
 edges = cv.dilate(edges,kernel,iterations = 3)
 
-print("done")
+print("done creating edge map")
 
-plt.subplot(121),plt.imshow(img,cmap = 'gray')
-plt.title('Original Image'), plt.xticks([]), plt.yticks([])
-plt.subplot(122),plt.imshow(edges,cmap = 'gray')
-plt.title('Edge Image'), plt.xticks([]), plt.yticks([])
-#plt.show()
-
-cv.imshow('a7',edges)
-cv.waitKey(0)
-
+print("creating masks")
 contours, hierarchy = cv.findContours(edges, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-#final = cv.drawContours(img, contours, -1, (0,255,0), 3)
 
 contours = np.array(contours, dtype=object)
 hier = np.array(hierarchy)
-print(contours.shape)
-print(hier.shape)
 len_h = int(contours.shape[0] * .5)
 hier_ind = hier[:,:,2] >= 0
-print(hier_ind.shape)
 
 final = cv.drawContours(img, contours[:len_h], -1, (255,0,0), 3)
 
@@ -82,12 +64,7 @@ for i in range(len(contours)):
     # draw ith convex hull object
     cv.drawContours(drawing, hull, i, color, 1, 8)
 
-cv.imshow('a7', final)
-cv.waitKey(0)
-
-cv.imshow('p', drawing)
-cv.waitKey(0)
-
+masks = []
 for i in range(len(hull)):
     original =  cv.imread(filename) 
     mask = np.ones(original.shape)
@@ -104,11 +81,36 @@ for i in range(len(hull)):
     mask = mask.astype('uint8')
 
     kernel_s = (31,31)
-    print(kernel_s)
     kernel = np.ones(kernel_s,np.uint8)
     mask = cv.erode(mask,kernel,iterations = 3)
 
-    cv.imshow(" ", mask*255)
-    cv.waitKey(0)
-    cv.imshow("", cv.imread(filename) * (mask))
-    cv.waitKey(0)
+    masks.append(mask)
+    
+images = []
+for i in range(len(masks)):
+    images.append(cv.imread(filename))
+masks = np.array(masks).transpose((0, 3, 1, 2))
+images = np.array(images).transpose((0, 3, 1, 2))
+mask_tens = torch.from_numpy(masks)
+image_tens = torch.from_numpy(images)
+print("done creating masks")
+
+print("loading model....")
+dev = get_device()
+model = load_model(model_name)
+applied_images = image_tens * mask_tens
+applied_images = applied_images
+mask_tens = mask_tens
+print("done loading model from file")
+
+print("running model....")
+total = len(applied_images)
+for i in range(len(applied_images)):
+    ind = i + 1
+    print(F"copying image {ind}/{total} to device...")
+    ap_im = applied_images[i].to(dev)
+    print("copied. Running...")
+    res = model(applied_images, mask_tens)
+print("done running model")
+
+print(res.shape)

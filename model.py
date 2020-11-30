@@ -427,12 +427,21 @@ class PartConvModel(nn.Module):
 
     return y13
 
-def load_model(file_name):
+device = None
+def get_device():
+    global device
+    if device is None:
+        use_cuda = torch.cuda.is_available()
+        print("cuda avalible: ", use_cuda)
+        device = torch.device("cuda" if use_cuda else "cpu")
+    return device
 
-    model_save_name = file_name
-    path = F"/content/gdrive/MyDrive/{model_save_name}" 
-    model.load_state_dict(torch.load(path, map_location=device))
-    vali_dev = torch.device("cpu")
-    model = model.to(vali_dev)
+def load_model(file_name):
+    global device
+    model = PartConvModel()
+    device = get_device()
+    path = file_name
+    model.load_state_dict(torch.load(path))
+    model = model.to(device)
     return model
 
