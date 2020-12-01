@@ -438,10 +438,10 @@ def get_device():
 
 def load_model(file_name):
     global device
-    model = PartConvModel()
-    device = get_device()
+    if device is None:
+        device = get_device()
     path = file_name
+    model = PartConvModel().to(device)
     model.load_state_dict(torch.load(path))
-    model = model.to(device)
     return model
 
