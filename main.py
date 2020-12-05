@@ -46,11 +46,12 @@ def read_orig_image(type=cv.COLOR_BGR2HSV, dim=None):
     return img
 
 img = read_orig_image(dim=700)
-    
+#img = cv.cvtColor(img, cv.COLOR_RGB2HSV)
+
 print("loaded image with shape:", img.shape)
 
 print("creating edge map using canny")
-img[:,:,1] = 255
+#img[:,:,1] = 255
 img = cv.bilateralFilter(img,15,100,75)
 filter = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
 img = cv.filter2D(img,-1,filter)
@@ -60,6 +61,8 @@ kernel_s = (3,3)
 kernel = np.ones(kernel_s,np.uint8)
 edges = cv.dilate(edges,kernel,iterations = 1)
 
+img = cv.cvtColor(img, cv.COLOR_RGB2BGR)
+cv.imshow("img", img)
 cv.imshow("edge map", edges)
 cv.waitKey(0)
 
